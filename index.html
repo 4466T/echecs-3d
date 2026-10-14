@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0b0908">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Échecs 3D">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="e3d-token" content="__E3D_TOKEN__">
+<title>Échecs 3D</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23120e0b'/%3E%3Ctext x='32' y='47' font-size='42' text-anchor='middle' fill='%23d4ad62'%3E%E2%99%9A%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/style.css">
+<script type="importmap">
+{ "imports": {
+  "three": "./vendor/three/three.module.js",
+  "three/addons/": "./vendor/three/addons/",
+  "chess.js": "./vendor/chess.js/chess.js"
+} }
+</script>
+</head>
+<body>
+<canvas id="scene" aria-label="Échiquier 3D"></canvas>
+
+<div id="loading" class="loading"><div class="loader"></div><p>Préparation de l'échiquier…</p></div>
+
+<aside id="panel" class="panel" aria-label="Tableau de bord">
+  <header class="brand">
+    <div class="mark" aria-hidden="true">♚</div>
+    <div class="brand-text">
+      <h1>Échecs 3D</h1>
+      <p id="matchline">—</p>
+    </div>
+  </header>
+
+  <section id="status" class="status" data-kind="turn" role="status" aria-live="polite">
+    <span id="statusIcon" class="status-icon" aria-hidden="true"></span>
+    <span id="statusText">—</span>
+    <span id="hourglassFlag" class="hg-flag" data-hourglass="hidden" aria-hidden="true">⌛</span>
+  </section>
+
+  <section class="players">
+    <div class="player" id="playerTop">
+      <div class="p-head"><span class="p-dot"></span><span class="p-name">—</span><span class="p-clock" hidden>--:--</span></div>
+      <div class="p-captured"></div>
+    </div>
+    <div class="evalbar" title="Évaluation (moteur)">
+      <div class="eval-track"><div id="evalFill" class="eval-fill"></div></div>
+      <span id="evalText">0.0</span>
+    </div>
+    <div class="player" id="playerBottom">
+      <div class="p-head"><span class="p-dot"></span><span class="p-name">—</span><span class="p-clock" hidden>--:--</span></div>
+      <div class="p-captured"></div>
+    </div>
+  </section>
+
+  <section class="moves">
+    <div class="sec-title"><h2>Coups</h2><span id="moveCount"></span></div>
+    <ol id="moveList" class="move-list"></ol>
+    <div id="reviewBar" class="review" hidden><span>Revue de la position</span><button id="btnLive" class="btn small">Retour à la partie</button></div>
+  </section>
+
+  <nav class="actions" aria-label="Actions">
+    <button class="btn primary" id="btnNew" title="Nouvelle partie (N)">Nouvelle partie</button>
+    <button class="btn" id="btnUndo" title="Annuler le coup (⌘Z / Ctrl+Z)">Annuler</button>
+    <button class="btn" id="btnHint" title="Indice (H)">Indice</button>
+    <button class="btn" id="btnFlip" title="Retourner l'échiquier (F)">Retourner</button>
+    <button class="btn" id="btnDraw" title="Proposer nulle">Proposer nulle</button>
+    <button class="btn" id="btnResign" title="Abandonner">Abandonner</button>
+    <button class="btn" id="btnPgn" title="PGN / FEN">PGN · FEN</button>
+    <button class="btn" id="btnSettings" title="Paramètres">Paramètres</button>
+  </nav>
+
+  <div class="views" role="group" aria-label="Vues">
+    <span class="views-label">Vue</span>
+    <button class="chip active" data-view="joueur" title="Vue joueur (1)">Joueur</button>
+    <button class="chip" data-view="dessus" title="Vue de dessus (2)">Dessus</button>
+    <button class="chip" data-view="cote" title="Vue latérale (3)">Côté</button>
+    <button class="chip" data-view="cine" title="Vue cinématique (4)">Ciné</button>
+  </div>
+  <footer class="panel-foot">
+    <span id="saveInfo" class="muted"></span>
+    <button class="btn ghost small" id="btnQuit" title="Quitter et arrêter le jeu">Quitter</button>
+  </footer>
+</aside>
+
+<!-- Nouvelle partie -->
+<div class="modal" id="modalNew" hidden>
+  <div class="card">
+    <h2>Nouvelle partie</h2>
+    <div class="field">
+      <label>Votre couleur</label>
+      <div class="seg" id="segColor">
+        <button data-v="w" class="active">Blancs</button><button data-v="b">Noirs</button><button data-v="r">Aléatoire</button>
+      </div>
+    </div>
+    <div class="field">
+      <label>Niveau de l'ordinateur : <strong id="levelName"></strong></label>
+      <input type="range" id="levelRange" min="1" max="8" step="1" value="4">
+      <div class="scale"><span>Débutant</span><span>Grand Maître</span></div>
+    </div>
+    <div class="field">
+      <label>Cadence</label>
+      <div class="seg" id="segClock">
+        <button data-v="none" class="active">Sans pendule</button><button data-v="10+0">10 min</button><button data-v="15+10">15 + 10</button><button data-v="30+0">30 min</button>
+      </div>
+    </div>
+    <div class="row-end"><button class="btn ghost" data-close>Annuler</button><button class="btn primary" id="btnStart">Commencer</button></div>
+  </div>
+</div>
+
+<!-- Paramètres -->
+<div class="modal" id="modalSettings" hidden>
+  <div class="card">
+    <h2>Paramètres</h2>
+    <div class="field"><label>Thème</label><div class="seg" id="segTheme"><button data-v="bois">Bois classique</button><button data-v="marbre">Marbre et ébène</button></div></div>
+    <div class="field"><label>Qualité graphique</label><div class="seg" id="segQuality"><button data-v="auto">Auto</button><button data-v="haut">Haut</button><button data-v="moyen">Moyen</button><button data-v="bas">Bas</button></div></div>
+    <div class="field"><label>Volume</label><input type="range" id="volRange" min="0" max="1" step="0.05"></div>
+    <label class="check"><input type="checkbox" id="chkMute"> Couper le son</label>
+    <label class="check"><input type="checkbox" id="chkMotion"> Réduire les animations</label>
+    <label class="check"><input type="checkbox" id="chkHgMine"> Afficher aussi le sablier pendant mon tour</label>
+    <div class="row-end"><button class="btn primary" data-close>Fermer</button></div>
+  </div>
+</div>
+
+<!-- PGN / FEN -->
+<div class="modal" id="modalPgn" hidden>
+  <div class="card wide">
+    <h2>PGN · FEN</h2>
+    <div class="field"><label>FEN de la position</label><input type="text" id="fenOut" readonly></div>
+    <div class="field"><label>PGN de la partie</label><textarea id="pgnOut" rows="6" readonly></textarea></div>
+    <div class="row"><button class="btn" id="btnCopyFen">Copier FEN</button><button class="btn" id="btnCopyPgn">Copier PGN</button></div>
+    <div class="field"><label>Importer (PGN ou FEN)</label><textarea id="importIn" rows="4" placeholder="Collez ici un PGN ou une FEN"></textarea></div>
+    <p id="importErr" class="err" hidden></p>
+    <div class="row-end"><button class="btn ghost" data-close>Fermer</button><button class="btn primary" id="btnImport">Importer</button></div>
+  </div>
+</div>
+
+<!-- Promotion -->
+<div class="modal light" id="modalPromo" hidden>
+  <div class="card promo">
+    <h2>Promotion</h2>
+    <div class="promo-row" id="promoRow"></div>
+  </div>
+</div>
+
+<!-- Fin de partie -->
+<div class="banner" id="gameOver" hidden>
+  <div class="banner-card">
+    <div class="banner-icon" id="goIcon"></div>
+    <h2 id="goTitle"></h2>
+    <p id="goDetail"></p>
+    <div class="row"><button class="btn primary" id="btnReplay">Rejouer</button><button class="btn" id="btnAnalyse">Analyser</button></div>
+  </div>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+<div id="serverDown" class="server-down" hidden>Jeu arrêté — relancez Echecs3D pour continuer.</div>
+<div id="fatal" class="fatal" hidden><div class="card"><h2>Affichage 3D indisponible</h2><p id="fatalMsg"></p></div></div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
